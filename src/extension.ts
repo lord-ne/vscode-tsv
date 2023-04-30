@@ -32,7 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 
 		let pattern = /[^\t]*\t/g;
-		let maxColumnWidth = 1;
+		let widths: { min: number; max: number; }[] = [];
 		for (const range of editor.visibleRanges) {
 			const extendedRangeStart = new vscode.Position(Math.max(0, range.start.line - 1), 0);
 			const extendedRangeEnd = new vscode.Position(range.end.line + 1, 0);
@@ -40,13 +40,24 @@ export function activate(context: vscode.ExtensionContext) {
 			const lines = editor.document.getText(extendedRange).split(/\r\n|\r|\n/);
 			for (const line of lines) {
 				let match;
-				while ((match = pattern.exec(line)) !== null) {
-					maxColumnWidth = Math.max(match[0].length, maxColumnWidth);
+				for (let c = 0; ((match = pattern.exec(line)) !== null); c++) {
+					const len = match[0].length;
+					if (widths[c] === undefined) {
+						widths[c] = { min: len, max: len };
+					} else {
+						widths[c].min = Math.min(len, widths[c].min);
+						widths[c].max = Math.max(len, widths[c].max);
+					}
 				}
 			}
 		}
 
-		editor.options.tabSize = maxColumnWidth + 1;
+		const maxWidthDif = widths.reduce(function(prevWidth, currEl) {
+			const currWidth = currEl.max - currEl.min;
+			return (prevWidth > currWidth) ? prevWidth : currWidth;
+		}, 0);
+
+		editor.options.tabSize = maxWidthDif + 3;
 	};
 
 	let timer: NodeJS.Timer;
